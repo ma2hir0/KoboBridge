@@ -1,130 +1,21 @@
-<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b1220">
-<title>KoboBridge</title>
-<style>
-:root{color-scheme:dark;--bg:#0b1220;--panel:#121d2e;--tile:#1a2940;--line:#2a3b53;--text:#edf3fb;--muted:#9aabc0;--accent:#42d392}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-header{max-width:760px;margin:auto;padding:14px 16px 8px;display:flex;align-items:center;justify-content:space-between}
-h1{font-size:21px;margin:0}main{max-width:760px;margin:auto;padding:8px 14px 24px}
-.sub{color:var(--muted);font-size:12px;margin:4px 0 0}.screen{display:none}.screen.active{display:block}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:13px;margin:9px 0}
-.hero{text-align:center;padding:15px 12px}.hero .value{font-size:clamp(28px,8vw,38px);font-weight:800;letter-spacing:-.5px;margin:5px 0}
-.progress{height:7px;background:#26364d;border-radius:20px;overflow:hidden;margin-top:9px}.bar{height:100%;background:var(--accent);width:0}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.tile{background:var(--tile);border:1px solid var(--line);border-radius:12px;padding:11px;text-align:left;color:var(--text);width:100%;min-width:0;cursor:pointer}
-.tile:active{transform:scale(.985)}.tile .label{display:block;color:var(--muted);font-size:12px}.tile strong{display:block;font-size:clamp(16px,4.5vw,20px);margin-top:5px;overflow-wrap:anywhere}.tile small{display:block;color:var(--muted);font-size:10px;margin-top:4px}
-.section-title{font-size:14px;color:var(--muted);margin:14px 3px 7px}
-button{border:0;border-radius:10px;padding:11px 13px;background:var(--accent);color:#082015;font-weight:750;font-size:14px;cursor:pointer}
-button.secondary{background:#26364d;color:var(--text)}button.danger{background:#512a35;color:#ffd3d8}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.back{background:#26364d;color:var(--text);padding:8px 11px}
-label{display:block;color:var(--muted);font-size:12px;margin:10px 0 5px}
-input{width:100%;background:#0c1727;color:white;border:1px solid var(--line);border-radius:9px;padding:11px;font-size:16px}
-.stock-card{background:var(--tile);border:1px solid var(--line);border-radius:12px;padding:12px;margin:9px 0}
-.stock-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.stock-name{font-weight:750}.stock-meta{font-size:11px;color:var(--muted)}
-.fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}.fields>div{min-width:0}
-.note{font-size:11px;color:var(--muted);line-height:1.6}.status{font-size:12px;color:var(--accent);min-height:18px;margin-top:8px}
-.empty{color:var(--muted);font-size:12px}.foot{padding:12px 4px;color:var(--muted);font-size:10px;text-align:center}
-@media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr)}}
-</style>
-</head>
-<body>
-<header><div><h1>KoboBridge</h1><p class="sub">資産をまとめて、シンプルに見える化。</p></div><span class="sub">個人用</span></header>
-<main>
-<section id="home" class="screen active">
- <div class="panel hero">
-  <div class="sub">総資産（円換算）</div><div class="value" id="total">¥0</div>
-  <div class="sub" id="goal-caption">目標 ¥30,000,000</div>
-  <div class="progress"><div class="bar" id="progress"></div></div>
-  <div class="sub" id="pct">達成率 0%</div>
- </div>
- <div class="section-title">資産内訳・数字をタップして編集</div>
- <div class="grid">
-  <button class="tile" onclick="openScreen('stocks')"><span class="label">米国個別株 評価額</span><strong id="stockTotal">¥0</strong><small>保有銘柄・株価を編集 ›</small></button>
-  <button class="tile" onclick="openScreen('stocks')"><span class="label">米国個別株 評価損益</span><strong id="stockPL">¥0</strong><small>銘柄別の損益を確認 ›</small></button>
-  <button class="tile" onclick="openScreen('funds')"><span class="label">NISA投資信託 評価額</span><strong id="fundTotal">¥0</strong><small>評価額を編集 ›</small></button>
-  <button class="tile" onclick="openScreen('funds')"><span class="label">NISA投資信託 積立元本</span><strong id="principal">¥0</strong><small>積立元本を編集 ›</small></button>
-  <button class="tile" onclick="openScreen('settings')"><span class="label">目標まで</span><strong id="left">¥0</strong><small>目標金額を編集 ›</small></button>
-  <button class="tile" onclick="openScreen('settings')"><span class="label">為替レート</span><strong id="fxView">¥0</strong><small>USD/JPYを編集 ›</small></button>
- </div>
- <div class="actions"><button class="secondary" onclick="exportJSON()">JSONを書き出す</button><button class="secondary" onclick="document.getElementById('file').click()">JSONを読み込む</button><input id="file" type="file" accept=".json,application/json" hidden onchange="importJSON(event)"></div>
- <div class="status" id="status"></div>
- <p class="note">入力内容はこのブラウザ内に自動保存されます。別端末との自動同期はありません。現金は資産合計に含めません。</p>
-</section>
-
-<section id="stocks" class="screen">
- <div class="actions"><button class="back" onclick="openScreen('home')">‹ 戻る</button></div>
- <div class="panel"><h2>米国個別株</h2><p class="sub">銘柄ごとに株数・取得単価・現在株価を編集できます。</p><div id="stockList"></div>
- <div class="actions"><button onclick="addStock()">＋銘柄を追加</button><button class="secondary" onclick="saveAndHome()">保存して戻る</button></div>
- <p class="note">入力内容は変更時に自動保存されます。株価自動取得は、KoBoTradeで使用した取得処理の移植が必要なため、この版では未接続です。</p></div>
-</section>
-
-<section id="funds" class="screen">
- <div class="actions"><button class="back" onclick="openScreen('home')">‹ 戻る</button></div>
- <div class="panel"><h2>NISA投資信託</h2>
- <label>積立元本（円）</label><input id="principalInput" type="number" inputmode="numeric">
- <label>現在評価額（円）</label><input id="fundInput" type="number" inputmode="numeric">
- <div class="actions"><button onclick="saveFunds()">保存して戻る</button><button class="secondary" onclick="openScreen('home')">キャンセル</button></div>
- </div>
-</section>
-
-<section id="settings" class="screen">
- <div class="actions"><button class="back" onclick="openScreen('home')">‹ 戻る</button></div>
- <div class="panel"><h2>目標・為替設定</h2>
- <label>目標総資産（円）</label><input id="goalInput" type="number" inputmode="numeric">
- <label>USD/JPY</label><input id="fxInput" type="number" step=".01" inputmode="decimal">
- <div class="actions"><button onclick="saveSettings()">保存して戻る</button><button class="secondary" onclick="openScreen('home')">キャンセル</button></div>
- </div>
-</section>
-<footer class="foot">KoboBridge · 個人用資産管理ツール</footer>
-</main>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1220"><title>KoboBridge</title><style>
+:root{--bg:#0b1220;--panel:#131e30;--panel2:#19263b;--line:#26364d;--txt:#edf3fb;--muted:#9aabc1;--green:#48d6a0;--red:#ff7c87;--blue:#7eb6ff}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#0b1220,#101a2b);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:560px;margin:auto;padding:env(safe-area-inset-top) 15px calc(28px + env(safe-area-inset-bottom))}header{display:flex;justify-content:space-between;align-items:center;padding:20px 2px 14px}h1{font-size:23px;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:4px}button{border:0;color:inherit;cursor:pointer;font:inherit}.iconbtn,.smallbtn{background:var(--panel2);border:1px solid var(--line);padding:9px 12px;border-radius:12px}.hero{background:linear-gradient(135deg,#1b3553,#17263d);border:1px solid #2c4968;border-radius:20px;padding:18px;margin:5px 0 12px}.label{color:var(--muted);font-size:12px}.total{font-size:32px;font-weight:750;margin:5px 0 3px}.progress{height:8px;background:#0c1728;border-radius:99px;overflow:hidden;margin:12px 0 7px}.progress span{display:block;height:100%;background:linear-gradient(90deg,#4da9ff,#4be0a5);border-radius:99px}.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 18px}.tile{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;text-align:left;min-height:88px}.tile:active,.stock:active{transform:scale(.99);background:var(--panel2)}.value{font-size:19px;font-weight:700;margin-top:7px}.small{font-size:11px;color:var(--muted);margin-top:3px}.sectionhead{display:flex;justify-content:space-between;align-items:center;margin:16px 2px 8px}h2{font-size:15px;margin:0}.muted{color:var(--muted)}.stocklist{display:grid;gap:7px}.stock{width:100%;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px 13px}.stockname{font-weight:700;font-size:14px}.stockmeta{font-size:11px;color:var(--muted);margin-top:3px}.stockright{text-align:right}.stockvalue{font-size:14px;font-weight:700}.pl{font-size:11px;margin-top:3px}.pos{color:var(--green)}.neg{color:var(--red)}.screen{display:none}.screen.active{display:block}.dashboard.hidden{display:none}.back{background:none;color:var(--blue);padding:8px 0;margin:2px 0 10px}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin:8px 0}h3{font-size:18px;margin:2px 0 14px}.field{display:block;margin:13px 0}.field span{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}input{width:100%;background:#0b1525;border:1px solid #30435d;color:var(--txt);border-radius:11px;padding:13px;font-size:16px;outline:none}input:focus{border-color:var(--blue)}.actions{display:flex;gap:9px;margin-top:18px}.primary,.danger{padding:12px 15px;border-radius:12px;font-weight:700;flex:1}.primary{background:#2879c9}.danger{background:#49232d;color:#ffc3c8;flex:0 0 auto}.note{font-size:11px;color:var(--muted);line-height:1.6;margin-top:10px}.rowbuttons{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}footer{font-size:10px;color:#71839b;text-align:center;padding:20px 0 4px}@media(max-width:370px){.total{font-size:28px}.tile{padding:12px}.stock{padding:10px}}
+</style></head><body><main><header><div><h1>KoboBridge</h1><div class="sub">資産ダッシュボード</div></div><button class="iconbtn" onclick="showScreen('settings')">設定</button></header>
+<section id="dashboard" class="dashboard"><div class="hero"><div class="label">総資産（米国個別株 + NISA投資信託）</div><div class="total" id="totalAssets">—</div><div class="label" id="goalLine">目標まで —</div><div class="progress"><span id="goalBar" style="width:0%"></span></div><div class="label" id="goalPct">目標達成率 —</div></div>
+<div class="tiles"><button class="tile" onclick="showScreen('stocks')"><div class="label">米国個別株 合計</div><div class="value" id="stockTotal">—</div><div class="small" id="stockPL">評価損益 —</div></button><button class="tile" onclick="showScreen('funds')"><div class="label">NISA投資信託</div><div class="value" id="fundValue">—</div><div class="small" id="fundPrincipal">元本 —</div></button><button class="tile" onclick="showScreen('settings')"><div class="label">目標まで / 為替レート</div><div class="value" id="remaining">—</div><div class="small" id="fxLabel">USD/JPY —</div></button><button class="tile" onclick="exportJSON()"><div class="label">バックアップ</div><div class="value">JSONを書き出す</div><div class="small">データの保存・移行</div></button></div>
+<div class="sectionhead"><h2>米国個別株</h2><button class="smallbtn" onclick="showScreen('stocks')">一覧・管理</button></div><div class="rowbuttons"><button class="smallbtn" onclick="refreshPrices()">株価を更新</button><button class="smallbtn" onclick="importJSON()">JSONを読み込む</button></div><div class="stocklist" id="stockRows"></div><div class="note">銘柄の行をタップすると、その銘柄専用の入力画面が開くよ。株価取得APIはこの版にはまだ接続していないため、現在株価は入力・更新待ち。</div></section>
+<section id="stocks" class="screen"><button class="back" onclick="showScreen('dashboard')">← ダッシュボード</button><div class="card"><h3>米国個別株一覧</h3><div class="label">銘柄ごとの行をタップして個別に編集できるよ。</div><div class="stocklist" id="manageRows" style="margin-top:12px"></div><div class="actions"><button class="primary" onclick="addStock()">＋ 銘柄を追加</button></div></div></section>
+<section id="stockEditor" class="screen"><button class="back" onclick="showScreen('stocks')">← 銘柄一覧</button><div class="card"><h3 id="stockEditorTitle">銘柄を編集</h3><label class="field"><span>銘柄名</span><input id="sName"></label><label class="field"><span>ティッカー</span><input id="sSymbol" autocapitalize="characters"></label><label class="field"><span>保有株数</span><input id="sShares" type="number" min="0" step="any"></label><label class="field"><span>取得単価（USD）</span><input id="sCost" type="number" min="0" step="any"></label><label class="field"><span>現在株価（USD）</span><input id="sPrice" type="number" min="0" step="any"></label><div class="note" id="stockCalc">評価額・評価損益は入力値から自動計算。</div><div class="actions"><button class="primary" onclick="saveStock()">保存</button><button class="danger" onclick="deleteStock()">削除</button></div></div></section>
+<section id="funds" class="screen"><button class="back" onclick="showScreen('dashboard')">← ダッシュボード</button><div class="card"><h3>NISA投資信託</h3><label class="field"><span>積立元本（円）</span><input id="principal" type="number" min="0"></label><label class="field"><span>評価額（円）</span><input id="fund" type="number" min="0"></label><div class="actions"><button class="primary" onclick="saveFunds()">保存</button></div></div></section>
+<section id="settings" class="screen"><button class="back" onclick="showScreen('dashboard')">← ダッシュボード</button><div class="card"><h3>目標・為替レート</h3><label class="field"><span>資産目標額（円）</span><input id="goal" type="number" min="0"></label><label class="field"><span>USD/JPY 為替レート</span><input id="fx" type="number" min="0" step="0.01"></label><div class="actions"><button class="primary" onclick="saveSettings()">保存</button></div><div class="note">総資産は米国個別株の円換算評価額とNISA投資信託の評価額の合計。現金は含めない設定だよ。</div></div><div class="card"><h3>データ管理</h3><div class="rowbuttons"><button class="smallbtn" onclick="exportJSON()">JSONを書き出す</button><button class="smallbtn" onclick="importJSON()">JSONを読み込む</button></div><div class="note">データはこのブラウザ内に保存されるよ。GitHub Pagesに公開したHTMLとは別管理なので、定期的にJSONでバックアップしてね。</div></div></section>
+<input id="fileInput" type="file" accept=".json,application/json" hidden onchange="handleImport(event)"><footer>データはこの端末のブラウザに保存されます。</footer></main>
 <script>
-const KEY='kobobridge_plain_v1';
-const seed={fx:158,goal:30000000,stocks:[
-{symbol:'AAPL',label:'Apple',shares:6,cost:246,price:0},
-{symbol:'AMZN',label:'Amazon',shares:10,cost:229,price:0},
-{symbol:'COST',label:'Costco',shares:1,cost:970,price:0},
-{symbol:'GOOG',label:'Google',shares:8,cost:283,price:0},
-{symbol:'MAR',label:'Marriott',shares:7,cost:285,price:0},
-{symbol:'MSFT',label:'Microsoft',shares:8,cost:466,price:0},
-{symbol:'PM',label:'PM',shares:12,cost:158,price:0}
-],principal:3200000,fund:4264221};
-let d={...seed,stocks:seed.stocks.map(x=>({...x}))};
-const $=id=>document.getElementById(id),num=v=>Number(v)||0, yen=v=>'¥'+Math.round(v).toLocaleString('ja-JP');
-function clean(x){return {fx:num(x.fx)||158,goal:num(x.goal)||30000000,stocks:Array.isArray(x.stocks)?x.stocks.map(s=>({symbol:String(s.symbol||''),label:String(s.label||s.symbol||''),shares:num(s.shares),cost:num(s.cost),price:num(s.price)})):[],principal:num(x.principal),fund:num(x.fund)}}
-function load(){try{const x=localStorage.getItem(KEY);if(x)d=clean(JSON.parse(x));}catch(e){}}
-function persist(msg='自動保存済み'){localStorage.setItem(KEY,JSON.stringify(d));$('status').textContent=msg;renderHome()}
-function renderHome(){
- const stockUsd=d.stocks.reduce((a,s)=>a+s.shares*s.price,0),plUsd=d.stocks.reduce((a,s)=>a+s.shares*(s.price-s.cost),0);
- const st=stockUsd*d.fx,pl=plUsd*d.fx,total=st+d.fund,g=d.goal||30000000,pct=total/g*100;
- $('total').textContent=yen(total);$('goal-caption').textContent='目標 '+yen(g);$('pct').textContent='達成率 '+pct.toFixed(1)+'%';
- $('progress').style.width=Math.max(0,Math.min(100,pct))+'%';$('stockTotal').textContent=yen(st);$('stockPL').textContent=(pl>=0?'+':'−')+yen(Math.abs(pl));$('fundTotal').textContent=yen(d.fund);$('principal').textContent=yen(d.principal);$('left').textContent=yen(Math.max(0,g-total));$('fxView').textContent='¥'+d.fx.toFixed(2);
-}
-function renderStocks(){
- $('stockList').innerHTML=d.stocks.map((s,i)=>`<div class="stock-card">
- <div class="stock-head"><div><div class="stock-name">${esc(s.label||s.symbol||'新規銘柄')}</div><div class="stock-meta">${esc(s.symbol||'ティッカー未設定')}</div></div><button class="danger" onclick="removeStock(${i})">削除</button></div>
- <div class="fields">
- <div><label>銘柄名</label><input value="${esc(s.label||'')}" oninput="editStock(${i},'label',this.value)"></div>
- <div><label>ティッカー</label><input autocapitalize="characters" value="${esc(s.symbol)}" oninput="editStock(${i},'symbol',this.value.toUpperCase())"></div>
- <div><label>保有株数</label><input type="number" inputmode="decimal" value="${s.shares}" oninput="editStock(${i},'shares',this.value)"></div>
- <div><label>取得単価（USD）</label><input type="number" step=".01" inputmode="decimal" value="${s.cost}" oninput="editStock(${i},'cost',this.value)"></div>
- <div><label>現在株価（USD）</label><input type="number" step=".01" inputmode="decimal" value="${s.price}" oninput="editStock(${i},'price',this.value)"></div>
- <div><label>評価額（USD）</label><input value="${(s.shares*s.price).toFixed(2)}" disabled></div>
- </div></div>`).join('')||'<p class="empty">銘柄はまだ登録されていません。</p>';
-}
-function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function editStock(i,k,v){d.stocks[i][k]=['symbol','label'].includes(k)?v:num(v);localStorage.setItem(KEY,JSON.stringify(d));renderHome();const active=document.activeElement;const y=window.scrollY;}
-function addStock(){d.stocks.push({symbol:'',label:'',shares:0,cost:0,price:0});persist('銘柄を追加したよ');renderStocks()}
-function removeStock(i){if(confirm('この銘柄を削除する？')){d.stocks.splice(i,1);persist('銘柄を削除したよ');renderStocks()}}
-function openScreen(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));$(id).classList.add('active');if(id==='stocks')renderStocks();if(id==='funds'){$('principalInput').value=d.principal;$('fundInput').value=d.fund}if(id==='settings'){$('goalInput').value=d.goal;$('fxInput').value=d.fx}window.scrollTo(0,0)}
-function saveFunds(){d.principal=num($('principalInput').value);d.fund=num($('fundInput').value);persist('投資信託データを保存したよ');openScreen('home')}
-function saveSettings(){d.goal=num($('goalInput').value)||30000000;d.fx=num($('fxInput').value)||158;persist('設定を保存したよ');openScreen('home')}
-function saveAndHome(){persist('米国株データを保存したよ');openScreen('home')}
-function exportJSON(){const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='KoboBridge-backup.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);$('status').textContent='JSONを書き出したよ'}
-async function importJSON(e){try{const x=JSON.parse(await e.target.files[0].text());if(!Array.isArray(x.stocks))throw Error();d=clean(x);persist('JSONを読み込んだよ');openScreen('home')}catch(err){alert('JSONを読み込めませんでした')}e.target.value=''}
-load();renderHome();
-</script>
-</body></html>
+const KEY='kobobridge_plain_v1';const seed={fx:158,goal:30000000,stocks:[{name:'Apple',symbol:'AAPL',shares:6,cost:246,price:0},{name:'Amazon',symbol:'AMZN',shares:10,cost:229,price:0},{name:'Costco',symbol:'COST',shares:1,cost:970,price:0},{name:'Alphabet',symbol:'GOOG',shares:8,cost:283,price:0},{name:'Marriott',symbol:'MAR',shares:7,cost:285,price:0},{name:'Microsoft',symbol:'MSFT',shares:8,cost:466,price:0},{name:'Philip Morris',symbol:'PM',shares:12,cost:158,price:0}],principal:3200000,fund:4264221};let data=loadData(),editingIndex=-1;
+function loadData(){try{let v=JSON.parse(localStorage.getItem(KEY));if(v&&Array.isArray(v.stocks))return {...seed,...v}}catch(e){}return JSON.parse(JSON.stringify(seed))}function persist(){localStorage.setItem(KEY,JSON.stringify(data));render()}const yen=n=>'¥'+Math.round(Number(n)||0).toLocaleString('ja-JP'),usd=n=>'$'+(Number(n)||0).toLocaleString('en-US',{maximumFractionDigits:2});function stockVal(s){return (Number(s.shares)||0)*(Number(s.price)||0)*data.fx}function stockCost(s){return (Number(s.shares)||0)*(Number(s.cost)||0)*data.fx}function stockPL(s){return stockVal(s)-stockCost(s)}function fmtPL(n){return (n>=0?'+':'−')+yen(Math.abs(n))}
+function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function stockRow(s,i){let pl=stockPL(s),unknown=!Number(s.price);return `<button class="stock" onclick="editStock(${i})"><div><div class="stockname">${esc(s.symbol||'—')} <span class="muted" style="font-weight:400">${esc(s.name||'')}</span></div><div class="stockmeta">${Number(s.shares)||0}株 · 取得 ${usd(s.cost)} · 現在 ${unknown?'未入力':usd(s.price)}</div></div><div class="stockright"><div class="stockvalue">${unknown?'—':yen(stockVal(s))}</div><div class="pl ${pl>=0?'pos':'neg'}">${unknown?'株価未入力':fmtPL(pl)}</div></div></button>`}
+function render(){let st=data.stocks.reduce((a,s)=>a+stockVal(s),0),pl=data.stocks.reduce((a,s)=>a+stockPL(s),0),total=st+(Number(data.fund)||0),goal=Number(data.goal)||0,pct=goal?Math.min(100,total/goal*100):0;document.getElementById('totalAssets').textContent=yen(total);document.getElementById('goalLine').textContent='目標まで '+yen(Math.max(0,goal-total));document.getElementById('goalBar').style.width=pct+'%';document.getElementById('goalPct').textContent='目標達成率 '+pct.toFixed(1)+'%';document.getElementById('stockTotal').textContent=yen(st);document.getElementById('stockPL').textContent='評価損益 '+fmtPL(pl);document.getElementById('fundValue').textContent=yen(data.fund);document.getElementById('fundPrincipal').textContent='元本 '+yen(data.principal);document.getElementById('remaining').textContent=yen(Math.max(0,goal-total));document.getElementById('fxLabel').textContent='USD/JPY '+Number(data.fx).toFixed(2);let rows=data.stocks.map(stockRow).join('');document.getElementById('stockRows').innerHTML=rows;document.getElementById('manageRows').innerHTML=rows}
+function showScreen(id){document.getElementById('dashboard').classList.toggle('hidden',id!=='dashboard');document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));if(id!=='dashboard')document.getElementById(id).classList.add('active');if(id==='funds'){principal.value=data.principal;fund.value=data.fund}if(id==='settings'){goal.value=data.goal;fx.value=data.fx}if(id==='stocks')document.getElementById('manageRows').innerHTML=data.stocks.map(stockRow).join('');window.scrollTo(0,0)}
+function editStock(i){editingIndex=i;let s=data.stocks[i];document.getElementById('stockEditorTitle').textContent=s.symbol+' の入力';sName.value=s.name||'';sSymbol.value=s.symbol||'';sShares.value=s.shares??0;sCost.value=s.cost??0;sPrice.value=s.price??0;updateStockCalc();showScreen('stockEditor')}function updateStockCalc(){let sh=Number(sShares.value)||0,c=Number(sCost.value)||0,p=Number(sPrice.value)||0;stockCalc.textContent='評価額 '+yen(sh*p*data.fx)+' ／ 評価損益 '+fmtPL((p-c)*sh*data.fx)}['sShares','sCost','sPrice'].forEach(id=>document.getElementById(id).addEventListener('input',updateStockCalc));
+function saveStock(){if(editingIndex<0)return;data.stocks[editingIndex]={name:sName.value.trim(),symbol:sSymbol.value.trim().toUpperCase(),shares:Number(sShares.value)||0,cost:Number(sCost.value)||0,price:Number(sPrice.value)||0};persist();showScreen('stocks')}function deleteStock(){if(editingIndex<0||!confirm('この銘柄を削除する？'))return;data.stocks.splice(editingIndex,1);persist();showScreen('stocks')}function addStock(){data.stocks.push({name:'New stock',symbol:'',shares:0,cost:0,price:0});editingIndex=data.stocks.length-1;persist();editStock(editingIndex)}function saveFunds(){data.principal=Number(principal.value)||0;data.fund=Number(fund.value)||0;persist();showScreen('dashboard')}function saveSettings(){data.goal=Number(goal.value)||0;data.fx=Number(fx.value)||0;persist();showScreen('dashboard')}
+function exportJSON(){let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='KoboBridge-backup.json';a.click();URL.revokeObjectURL(url)}function importJSON(){fileInput.click()}function handleImport(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(!Array.isArray(x.stocks))throw Error();data={...seed,...x,stocks:x.stocks.map(s=>({name:s.name||s.symbol||'',symbol:s.symbol||'',shares:Number(s.shares)||0,cost:Number(s.cost)||0,price:Number(s.price)||0}))};persist();alert('JSONを読み込んだよ');showScreen('dashboard')}catch(err){alert('JSONを読み込めませんでした。ファイルを確認してね。')}};r.readAsText(f);e.target.value=''}function refreshPrices(){alert('この版では株価APIは未接続だよ。各銘柄をタップして「現在株価」を入力してね。')}render();
+</script></body></html>

@@ -3,7 +3,7 @@
 </style></head><body><main><header><div><h1>KoboBridge</h1><div class="sub">資産ダッシュボード</div></div></header>
 <section id="dashboard" class="dashboard"><div class="hero"><div class="label">総資産（米国個別株 + NISA投資信託）</div><div class="total" id="totalAssets">—</div><div class="label" id="goalLine">目標まで —</div><div class="progress"><span id="goalBar" style="width:0%"></span></div><div class="label" id="goalPct">目標達成率 —</div></div>
 <div class="tiles"><button class="tile" onclick="showScreen('stocks')"><div class="label">米国個別株 合計</div><div class="value" id="stockTotal">—</div><div class="small" id="stockPL">評価損益 —</div></button><button class="tile" onclick="showScreen('funds')"><div class="label">NISA投資信託</div><div class="value" id="fundValue">—</div><div class="small" id="fundPrincipal">元本 —</div></button><button class="tile" onclick="showScreen('settings')"><div class="label">目標まで / 為替レート</div><div class="value" id="remaining">—</div><div class="small" id="fxLabel">USD/JPY —</div></button><button class="tile" onclick="exportJSON()"><div class="label">バックアップ</div><div class="value">JSONを書き出す</div><div class="small">データの保存・移行</div></button></div>
-<div class="sectionhead"><h2>米国個別株</h2></div><div class="rowbuttons"><button class="smallbtn" onclick="refreshPrices()">株価を更新</button><button class="smallbtn" onclick="importJSON()">JSONを読み込む</button></div><div class="stocklist" id="stockRows"></div><div class="note">銘柄の行をタップすると、その銘柄専用の入力画面が開くよ。株価取得APIはこの版にはまだ接続していないため、現在株価は入力・更新待ち。</div></section>
+<div class="sectionhead"><h2>米国個別株</h2></div><div class="rowbuttons"><button id="refreshPricesButton" class="smallbtn" onclick="refreshPrices()">株価を更新</button><button class="smallbtn" onclick="importJSON()">JSONを読み込む</button></div><div id="priceStatus" class="note" role="status" aria-live="polite">株価は未更新です。</div><div class="stocklist" id="stockRows"></div><div class="note">銘柄の行をタップすると、その銘柄専用の入力画面が開くよ。株価はTwelve Dataから取得します。</div></section>
 <section id="stocks" class="screen"><button class="back" onclick="showScreen('dashboard')">← ダッシュボード</button><div class="card"><h3>米国個別株一覧</h3><div class="label">銘柄ごとの行をタップして個別に編集できるよ。</div><div class="stocklist" id="manageRows" style="margin-top:12px"></div><div class="actions"><button class="primary" onclick="addStock()">＋ 銘柄を追加</button></div></div></section>
 <section id="stockEditor" class="screen"><button class="back" onclick="showScreen('dashboard')">← ダッシュボード</button><div class="card"><h3 id="stockEditorTitle">銘柄を編集</h3><label class="field"><span>銘柄名</span><input id="sName"></label><label class="field"><span>ティッカー</span><input id="sSymbol" autocapitalize="characters"></label><label class="field"><span>保有株数</span><input id="sShares" type="number" min="0" step="any"></label><label class="field"><span>取得単価（USD）</span><input id="sCost" type="number" min="0" step="any"></label><label class="field"><span>現在株価（USD）</span><input id="sPrice" type="number" min="0" step="any"></label><div class="note" id="stockCalc">評価額・評価損益は入力値から自動計算。</div><div class="actions"><button class="primary" onclick="saveStock()">保存</button><button class="danger" onclick="deleteStock()">削除</button></div></div></section>
 <section id="funds" class="screen"><button class="back" onclick="showScreen('dashboard')">← ダッシュボード</button><div class="card"><h3>NISA投資信託</h3><label class="field"><span>積立元本（円）</span><input id="principal" type="number" min="0"></label><label class="field"><span>評価額（円）</span><input id="fund" type="number" min="0"></label><div class="actions"><button class="primary" onclick="saveFunds()">保存</button></div></div></section>
@@ -13,40 +13,74 @@
 const KEY='kobobridge_plain_v1';const API_KEY_STORAGE='kobobridge_twelvedata_key_v1';const seed={fx:158,goal:30000000,stocks:[{name:'Apple',symbol:'AAPL',shares:6,cost:246,price:0},{name:'Amazon',symbol:'AMZN',shares:10,cost:229,price:0},{name:'Costco',symbol:'COST',shares:1,cost:970,price:0},{name:'Alphabet',symbol:'GOOG',shares:8,cost:283,price:0},{name:'Marriott',symbol:'MAR',shares:7,cost:285,price:0},{name:'Microsoft',symbol:'MSFT',shares:8,cost:466,price:0},{name:'Philip Morris',symbol:'PM',shares:12,cost:158,price:0}],principal:3200000,fund:4264221};let data=loadData(),editingIndex=-1;
 function loadData(){try{let v=JSON.parse(localStorage.getItem(KEY));if(v&&Array.isArray(v.stocks))return {...seed,...v}}catch(e){}return JSON.parse(JSON.stringify(seed))}function persist(){localStorage.setItem(KEY,JSON.stringify(data));render()}const yen=n=>'¥'+Math.round(Number(n)||0).toLocaleString('ja-JP'),usd=n=>'$'+(Number(n)||0).toLocaleString('en-US',{maximumFractionDigits:2});function stockVal(s){return (Number(s.shares)||0)*(Number(s.price)||0)*data.fx}function stockCost(s){return (Number(s.shares)||0)*(Number(s.cost)||0)*data.fx}function stockPL(s){return stockVal(s)-stockCost(s)}function fmtPL(n){return (n>=0?'+':'−')+yen(Math.abs(n))}
 function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function stockRow(s,i){let pl=stockPL(s),unknown=!Number(s.price);return `<button class="stock" onclick="editStock(${i})"><div><div class="stockname">${esc(s.symbol||'—')} <span class="muted" style="font-weight:400">${esc(s.name||'')}</span></div><div class="stockmeta">${Number(s.shares)||0}株 · 取得 ${usd(s.cost)} · 現在 ${unknown?'未入力':usd(s.price)}</div></div><div class="stockright"><div class="stockvalue">${unknown?'—':yen(stockVal(s))}</div><div class="pl ${pl>=0?'pos':'neg'}">${unknown?'株価未入力':fmtPL(pl)}</div></div></button>`}
-function render(){let st=data.stocks.reduce((a,s)=>a+stockVal(s),0),pl=data.stocks.reduce((a,s)=>a+stockPL(s),0),total=st+(Number(data.fund)||0),goal=Number(data.goal)||0,pct=goal?Math.min(100,total/goal*100):0;document.getElementById('totalAssets').textContent=yen(total);document.getElementById('goalLine').textContent='目標まで '+yen(Math.max(0,goal-total));document.getElementById('goalBar').style.width=pct+'%';document.getElementById('goalPct').textContent='目標達成率 '+pct.toFixed(1)+'%';document.getElementById('stockTotal').textContent=yen(st);document.getElementById('stockPL').textContent='評価損益 '+fmtPL(pl);document.getElementById('fundValue').textContent=yen(data.fund);document.getElementById('fundPrincipal').textContent='元本 '+yen(data.principal);document.getElementById('remaining').textContent=yen(Math.max(0,goal-total));document.getElementById('fxLabel').textContent='USD/JPY '+Number(data.fx).toFixed(2);let rows=data.stocks.map(stockRow).join('');document.getElementById('stockRows').innerHTML=rows;document.getElementById('manageRows').innerHTML=rows}
+function render(){let st=data.stocks.reduce((a,s)=>a+stockVal(s),0),pl=data.stocks.reduce((a,s)=>a+stockPL(s),0),total=st+(Number(data.fund)||0),goal=Number(data.goal)||0,pct=goal?Math.min(100,total/goal*100):0;document.getElementById('totalAssets').textContent=yen(total);document.getElementById('goalLine').textContent='目標まで '+yen(Math.max(0,goal-total));document.getElementById('goalBar').style.width=pct+'%';document.getElementById('goalPct').textContent='目標達成率 '+pct.toFixed(1)+'%';document.getElementById('stockTotal').textContent=yen(st);document.getElementById('stockPL').textContent='評価損益 '+fmtPL(pl);document.getElementById('fundValue').textContent=yen(data.fund);document.getElementById('fundPrincipal').textContent='元本 '+yen(data.principal);document.getElementById('remaining').textContent=yen(Math.max(0,goal-total));document.getElementById('fxLabel').textContent='USD/JPY '+Number(data.fx).toFixed(2);let rows=data.stocks.map(stockRow).join('');document.getElementById('stockRows').innerHTML=rows;document.getElementById('manageRows').innerHTML=rows;const ps=document.getElementById('priceStatus');if(ps&&data.lastPriceUpdate)ps.textContent='最終更新：'+new Date(data.lastPriceUpdate).toLocaleString('ja-JP')}
 function showScreen(id){document.getElementById('dashboard').classList.toggle('hidden',id!=='dashboard');document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));if(id!=='dashboard')document.getElementById(id).classList.add('active');if(id==='funds'){principal.value=data.principal;fund.value=data.fund}if(id==='settings'){goal.value=data.goal;fx.value=data.fx;apiKeyInput.value=localStorage.getItem(API_KEY_STORAGE)||''}if(id==='stocks')document.getElementById('manageRows').innerHTML=data.stocks.map(stockRow).join('');window.scrollTo(0,0)}
 function editStock(i){editingIndex=i;let s=data.stocks[i];document.getElementById('stockEditorTitle').textContent=s.symbol+' の入力';sName.value=s.name||'';sSymbol.value=s.symbol||'';sShares.value=s.shares??0;sCost.value=s.cost??0;sPrice.value=s.price??0;updateStockCalc();showScreen('stockEditor')}function updateStockCalc(){let sh=Number(sShares.value)||0,c=Number(sCost.value)||0,p=Number(sPrice.value)||0;stockCalc.textContent='評価額 '+yen(sh*p*data.fx)+' ／ 評価損益 '+fmtPL((p-c)*sh*data.fx)}['sShares','sCost','sPrice'].forEach(id=>document.getElementById(id).addEventListener('input',updateStockCalc));
 function saveStock(){if(editingIndex<0)return;data.stocks[editingIndex]={name:sName.value.trim(),symbol:sSymbol.value.trim().toUpperCase(),shares:Number(sShares.value)||0,cost:Number(sCost.value)||0,price:Number(sPrice.value)||0};persist();showScreen('dashboard')}function deleteStock(){if(editingIndex<0||!confirm('この銘柄を削除する？'))return;data.stocks.splice(editingIndex,1);persist();showScreen('dashboard')}function addStock(){data.stocks.push({name:'New stock',symbol:'',shares:0,cost:0,price:0});editingIndex=data.stocks.length-1;persist();editStock(editingIndex)}function saveFunds(){data.principal=Number(principal.value)||0;data.fund=Number(fund.value)||0;persist();showScreen('dashboard')}function saveSettings(){data.goal=Number(goal.value)||0;data.fx=Number(fx.value)||0;const key=apiKeyInput.value.trim();if(key)localStorage.setItem(API_KEY_STORAGE,key);else localStorage.removeItem(API_KEY_STORAGE);persist();showScreen('dashboard')}
 function exportJSON(){let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='KoboBridge-backup.json';a.click();URL.revokeObjectURL(url)}function importJSON(){fileInput.click()}function handleImport(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(!Array.isArray(x.stocks))throw Error();data={...seed,...x,stocks:x.stocks.map(s=>({name:s.name||s.symbol||'',symbol:s.symbol||'',shares:Number(s.shares)||0,cost:Number(s.cost)||0,price:Number(s.price)||0}))};persist();alert('JSONを読み込んだよ');showScreen('dashboard')}catch(err){alert('JSONを読み込めませんでした。ファイルを確認してね。')}};r.readAsText(f);e.target.value=''}async function refreshPrices(){
   const key=localStorage.getItem(API_KEY_STORAGE)||'';
-  const button=[...document.querySelectorAll('button')].find(b=>b.textContent.includes('株価を更新'));
+  const button=document.getElementById('refreshPricesButton');
   const status=document.getElementById('priceStatus');
-  if(!key){alert('先に「目標まで / 為替レート」からTwelve Data APIキーを登録してね。');showScreen('settings');return;}
+  const originalLabel='株価を更新';
+  if(!key){
+    if(status)status.textContent='APIキーが未登録です。設定画面でTwelve Data APIキーを登録してください。';
+    alert('先に「目標まで / 為替レート」からTwelve Data APIキーを登録してね。');
+    showScreen('settings');
+    return;
+  }
   const symbols=[...new Set(data.stocks.map(s=>String(s.symbol||'').trim().toUpperCase()).filter(Boolean))];
-  if(!symbols.length){alert('株価を取得する銘柄がありません。');return;}
+  if(!symbols.length){if(status)status.textContent='株価を取得する銘柄がありません。';return;}
   if(button){button.disabled=true;button.textContent='取得中…';}
-  if(status)status.textContent='Twelve Dataから株価を取得中…';
+  if(status)status.textContent='Twelve Dataから '+symbols.length+' 銘柄の株価を取得中…';
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),20000);
   try{
-    const url='https://api.twelvedata.com/price?symbol='+encodeURIComponent(symbols.join(','))+'&apikey='+encodeURIComponent(key);
-    const response=await fetch(url,{cache:'no-store'});
-    const result=await response.json();
-    if(!response.ok||result.status==='error'||result.code||result.message&&result.status==='error')throw new Error(result.message||'APIからエラーが返されました');
-    let updated=0;const failed=[];
-    for(const stock of data.stocks){
-      const ticker=String(stock.symbol||'').trim().toUpperCase();if(!ticker)continue;
-      const item=result[ticker]|| (symbols.length===1?result:null);
-      const price=Number(item?.price);
-      if(Number.isFinite(price)&&price>0){stock.price=price;updated++;}else failed.push(ticker);
+    // Twelve Data supports comma-separated symbols for the /price endpoint.
+    const params=new URLSearchParams({symbol:symbols.join(','),apikey:key});
+    const response=await fetch('https://api.twelvedata.com/price?'+params.toString(),{method:'GET',cache:'no-store',signal:controller.signal,headers:{'Accept':'application/json'}});
+    let result;
+    try{result=await response.json();}catch(e){throw new Error('APIの応答をJSONとして読み取れませんでした');}
+    if(!response.ok)throw new Error(result?.message||('HTTP '+response.status));
+    if(result?.status==='error'||result?.code&&Number(result.code)>=400)throw new Error(result.message||'Twelve Data APIエラー');
+
+    let updated=0;
+    const failed=[];
+    const details=[];
+    for(const ticker of symbols){
+      // Batch /price responses are keyed by ticker. A single-symbol response
+      // is simply { price: "..." }. Also tolerate a nested data wrapper.
+      let item=result?.[ticker];
+      if(!item&&symbols.length===1&&result?.price!==undefined)item=result;
+      if(!item&&result?.data?.[ticker])item=result.data[ticker];
+      const raw=item?.price??item?.data?.price;
+      const price=Number(raw);
+      if(Number.isFinite(price)&&price>0){
+        data.stocks.filter(s=>String(s.symbol||'').trim().toUpperCase()===ticker).forEach(s=>s.price=price);
+        updated++;
+      }else{
+        failed.push(ticker);
+        const reason=item?.message||item?.status==='error'?'APIエラー':'';
+        if(reason)details.push(ticker+': '+reason);
+      }
     }
-    data.lastPriceUpdate=new Date().toISOString();persist();
-    const message=updated+'/'+symbols.length+'銘柄を更新 · '+new Date(data.lastPriceUpdate).toLocaleString('ja-JP')+(failed.length?' · 未取得: '+failed.join(', '):'');
+    if(updated===0){
+      const firstError=details[0]||result?.message||'価格データが見つかりませんでした';
+      throw new Error(firstError+'。ティッカー表記・API利用枠・契約プランを確認してください。');
+    }
+    data.lastPriceUpdate=new Date().toISOString();
+    persist();
+    const stamp=new Date(data.lastPriceUpdate).toLocaleString('ja-JP');
+    const message=updated+'/'+symbols.length+'銘柄を更新しました（'+stamp+'）'+(failed.length?'。未取得：'+failed.join(', '):'。');
     if(status)status.textContent=message;
-    alert(message);
+    if(failed.length)alert(message+'\n未取得銘柄は前回の株価を保持しています。');
   }catch(error){
-    const message='株価取得に失敗：'+(error.message||'通信エラー');
+    const message=error.name==='AbortError'?'株価取得がタイムアウトしました。時間をおいて再試行してください。':'株価取得に失敗しました：'+(error.message||'通信エラー');
     if(status)status.textContent=message;
     alert(message+'\nAPIキー・通信状態・Twelve Dataの利用枠を確認してね。');
-  }finally{if(button){button.disabled=false;button.textContent='株価を更新';}}
+  }finally{
+    clearTimeout(timeout);
+    if(button){button.disabled=false;button.textContent=originalLabel;}
+  }
 }
 render();
 </script></body></html>
